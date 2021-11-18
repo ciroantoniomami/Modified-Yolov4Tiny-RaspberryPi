@@ -137,6 +137,8 @@ def get_data(train_csv_path, test_csv_path):
             min_height=IMAGE_SIZE, min_width=IMAGE_SIZE, border_mode=0
         ),
         A.Normalize(mean=[0., 0., 0.], std=[1., 1., 1.], max_pixel_value=255,),
+        A.Downscale (scale_min=0.25, scale_max=0.25, interpolation=0, always_apply=True, p=1),
+        A.MotionBlur(p=1),
         ToTensorV2(),
     ],
     bbox_params=A.BboxParams(format="yolo", min_visibility=0.4, label_fields=[]),
