@@ -4,3 +4,8 @@
 *.onnx
 /img/
 *.zip
+micro
+/wild/
+/models/
+/model_tf/
+/model50_tf/

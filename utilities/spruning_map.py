@@ -14,12 +14,11 @@ from loss import Loss
 import torch.nn as nn
 from utils import class_accuracy
 from dataset.dataset import get_data
-import onnx 
-from onnx_tf.backend import prepare
+
 import tensorflow as tf
 
 
-def prune_model(model):
+def prune_model(model, amount = 0.5):
     
     model.cpu()
     
@@ -27,7 +26,7 @@ def prune_model(model):
     # compute a dependency graph
     DG = tp.DependencyGraph().build_dependency( model, torch.randn(1, 3, 416, 416) )
     
-    def prune_conv(conv, amount=0.2):
+    def prune_conv(conv, amount=amount):
         
         strategy = tp.strategy.L1Strategy() # setup strategy 
         pruning_index = strategy(conv.weight, amount=amount)
@@ -56,67 +55,50 @@ if __name__ == '__main__':
             * torch.tensor(S).unsqueeze(1).unsqueeze(1).repeat(1, 3, 2)
         ).to("cuda:0")
 
+    def test(p):
 
-    loss_fn = Loss()
 
 
-    model = Yolo_Block(3,3,2)
-    model.load_state_dict(torch.load('./models/model.pt'))
-   
-    params = sum([np.prod(p.size()) for p in model.parameters()])
-    print("Number of Parameters: %.1fM"%(params/1e6))
-    test_model(model, test_loader, scaled_anchors, performance=class_accuracy, loss_fn= Loss(), device=None)
-    for i in range(7):
-       
-        prune_model(model)
+        model = Yolo_Block(3,3,2)
+        model.load_state_dict(torch.load('./models/model.pt'))
+    
         params = sum([np.prod(p.size()) for p in model.parameters()])
         print("Number of Parameters: %.1fM"%(params/1e6))
-        num_epochs = 20
+        test_model(model, test_loader, scaled_anchors, performance=class_accuracy, loss_fn= Loss(), device=None)
+
+        
+        prune_model(model, p)
+        params = sum([np.prod(p.size()) for p in model.parameters()])
+        print("Number of Parameters: %.1fM"%(params/1e6))
+        num_epochs = 100
         optimizer = RAdam(model.parameters(), lr=0.001/5, weight_decay=0.005)
         scaler = torch.cuda.amp.GradScaler()       
         # Retrain the model
         train_model(train_loader, model, optimizer, Loss(), num_epochs, scaler,  scaled_anchors,None, performance=class_accuracy,lr_scheduler= None,epoch_start_scheduler= 40)
         model.eval()
-    test_model(model, test_loader, scaled_anchors, performance=class_accuracy, loss_fn= Loss(), device=None)
+        test_model(model, test_loader, scaled_anchors, performance=class_accuracy, loss_fn= Loss(), device=None)
 
 
-    
- #   pred_boxes, true_boxes = get_evaluation_bboxes(
- #       test_loader,
- #       model,
- #       iou_threshold = 0.5,
- #       anchors=ANCHORS,
- #       threshold=0.05,
-#	device="cuda:0"
- #   )
 
-  #  mapval = mean_average_precision(
-   #     pred_boxes,
-   #     true_boxes,
-   #     iou_threshold=0.5,
-   #     num_classes=2,
-   # )
+        pred_boxes, true_boxes = get_evaluation_bboxes(
+            test_loader,
+            model,
+            iou_threshold = 0.5,
+            anchors=ANCHORS,
+            threshold=0.05,
+	    device="cuda:0"
+        )
 
-   # print(f"MAP: {mapval.item()}")
+        mapval = mean_average_precision(
+            pred_boxes,
+            true_boxes,
+            iou_threshold=0.5,
+            num_classes=2,
+        )
+        print(f"MAP: {mapval.item()}")
 
+    pruning_rates = [0.5,0.6,0.7]
 
-    # Conversion PyTorch-ONNX-TF-TFlite
-    sample_input = torch.rand((1,3,416, 416)).to("cuda:0")
-    torch.onnx.export(
-    model,                  
-    sample_input,                   
-    'onnx_model.onnx',       
-    opset_version=12,       
-    input_names=['input'] ,  
-    output_names=['output1', 'output2'] )
+    for p in pruning_rates:
+        test(p)
 
-    model = onnx.load("onnx_model.onnx")
-
-    tf_rep = prepare(model)
-    tf_rep.export_graph('modeld50_tf')
-
-    converter = tf.lite.TFLiteConverter.from_saved_model('modeld50_tf')
-   # converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    tflite_quant_model = converter.convert()
-    with open('p_02it.tflite', 'wb') as f:
-        f.write(tflite_quant_model)
