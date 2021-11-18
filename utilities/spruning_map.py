@@ -62,40 +62,42 @@ if __name__ == '__main__':
 
     model = Yolo_Block(3,3,2)
     model.load_state_dict(torch.load('./models/model.pt'))
-    optimizer = RAdam(model.parameters(), lr=0.001/5, weight_decay=0.005)
+   
     params = sum([np.prod(p.size()) for p in model.parameters()])
     print("Number of Parameters: %.1fM"%(params/1e6))
     test_model(model, test_loader, scaled_anchors, performance=class_accuracy, loss_fn= Loss(), device=None)
     for i in range(7):
+       
         prune_model(model)
         params = sum([np.prod(p.size()) for p in model.parameters()])
         print("Number of Parameters: %.1fM"%(params/1e6))
         num_epochs = 20
-        scaler = torch.cuda.amp.GradScaler()
+        optimizer = RAdam(model.parameters(), lr=0.001/5, weight_decay=0.005)
+        scaler = torch.cuda.amp.GradScaler()       
         # Retrain the model
         train_model(train_loader, model, optimizer, Loss(), num_epochs, scaler,  scaled_anchors,None, performance=class_accuracy,lr_scheduler= None,epoch_start_scheduler= 40)
-        optimizer.zero_grad()
+        model.eval()
     test_model(model, test_loader, scaled_anchors, performance=class_accuracy, loss_fn= Loss(), device=None)
 
 
     
-    pred_boxes, true_boxes = get_evaluation_bboxes(
-        test_loader,
-        model,
-        iou_threshold = 0.5,
-        anchors=ANCHORS,
-        threshold=0.05,
-	device="cuda:0"
-    )
+ #   pred_boxes, true_boxes = get_evaluation_bboxes(
+ #       test_loader,
+ #       model,
+ #       iou_threshold = 0.5,
+ #       anchors=ANCHORS,
+ #       threshold=0.05,
+#	device="cuda:0"
+ #   )
 
-    mapval = mean_average_precision(
-        pred_boxes,
-        true_boxes,
-        iou_threshold=0.5,
-        num_classes=2,
-    )
+  #  mapval = mean_average_precision(
+   #     pred_boxes,
+   #     true_boxes,
+   #     iou_threshold=0.5,
+   #     num_classes=2,
+   # )
 
-    print(f"MAP: {mapval.item()}")
+   # print(f"MAP: {mapval.item()}")
 
 
     # Conversion PyTorch-ONNX-TF-TFlite
@@ -114,7 +116,7 @@ if __name__ == '__main__':
     tf_rep.export_graph('modeld50_tf')
 
     converter = tf.lite.TFLiteConverter.from_saved_model('modeld50_tf')
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+   # converter.optimizations = [tf.lite.Optimize.DEFAULT]
     tflite_quant_model = converter.convert()
-    with open('pq_02it.tflite', 'wb') as f:
+    with open('p_02it.tflite', 'wb') as f:
         f.write(tflite_quant_model)

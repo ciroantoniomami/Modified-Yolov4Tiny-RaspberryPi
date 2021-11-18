@@ -2,8 +2,8 @@ import sys
 import os 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backbone import backbone
-from CSP import ConvBlock
+from yolo.backbone import backbone
+from yolo.CSP import ConvBlock
 
 import torch.nn as nn
 import torch
