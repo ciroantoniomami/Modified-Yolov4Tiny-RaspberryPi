@@ -66,15 +66,16 @@ if __name__ == '__main__':
         print("Number of Parameters: %.1fM"%(params/1e6))
         test_model(model, test_loader, scaled_anchors, performance=class_accuracy, loss_fn= Loss(), device=None)
 
+        for _ in range(7):
+            prune_model(model, p)
+            params = sum([np.prod(p.size()) for p in model.parameters()])
+            print("Number of Parameters: %.1fM"%(params/1e6))
+            num_epochs = 20
+            optimizer = RAdam(model.parameters(), lr=0.001/5, weight_decay=0.005)
+            scaler = torch.cuda.amp.GradScaler()       
+            # Retrain the model
+            train_model(train_loader, model, optimizer, Loss(), num_epochs, scaler,  scaled_anchors,None, performance=class_accuracy,lr_scheduler= None,epoch_start_scheduler= 40)
         
-        prune_model(model, p)
-        params = sum([np.prod(p.size()) for p in model.parameters()])
-        print("Number of Parameters: %.1fM"%(params/1e6))
-        num_epochs = 100
-        optimizer = RAdam(model.parameters(), lr=0.001/5, weight_decay=0.005)
-        scaler = torch.cuda.amp.GradScaler()       
-        # Retrain the model
-        train_model(train_loader, model, optimizer, Loss(), num_epochs, scaler,  scaled_anchors,None, performance=class_accuracy,lr_scheduler= None,epoch_start_scheduler= 40)
         model.eval()
         test_model(model, test_loader, scaled_anchors, performance=class_accuracy, loss_fn= Loss(), device=None)
 
@@ -97,7 +98,7 @@ if __name__ == '__main__':
         )
         print(f"MAP: {mapval.item()}")
 
-    pruning_rates = [0.5,0.6,0.7]
+    pruning_rates = [0.1,0.2]
 
     for p in pruning_rates:
         test(p)
