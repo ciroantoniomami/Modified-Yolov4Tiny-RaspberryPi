@@ -104,7 +104,7 @@ def get_data(train_csv_path, test_csv_path):
     ANCHORS = [[(0.289062, 0.339265), (0.02 ,  0.035), (0.007 ,   0.012   )], [(0.035 , 0.064  ), (0.012 ,0.021), (0.08  , 0.129  )]]
 
     
-    transforms = A.Compose(
+    transforms_train = A.Compose(
     [
         A.LongestMaxSize(max_size=IMAGE_SIZE),
         A.PadIfNeeded(
@@ -130,9 +130,22 @@ def get_data(train_csv_path, test_csv_path):
     
     )
 
+    transforms_test = A.Compose(
+    [
+        A.LongestMaxSize(max_size=IMAGE_SIZE),
+        A.PadIfNeeded(
+            min_height=IMAGE_SIZE, min_width=IMAGE_SIZE, border_mode=0
+        ),
+        A.Normalize(mean=[0., 0., 0.], std=[1., 1., 1.], max_pixel_value=255,),
+        ToTensorV2(),
+    ],
+    bbox_params=A.BboxParams(format="yolo", min_visibility=0.4, label_fields=[]),
+    
+    )
+
     train_dataset = CustomYoloDataset(
         train_csv_path,
-        transform=transforms,
+        transform=transforms_train,
         S=[IMAGE_SIZE // 32, IMAGE_SIZE // 16],
         img_dir=IMG_DIR,
         label_dir=LABEL_DIR,
@@ -140,7 +153,7 @@ def get_data(train_csv_path, test_csv_path):
     )
     test_dataset = CustomYoloDataset(
         test_csv_path,
-        transform=transforms,
+        transform=transforms_test,
         S=[IMAGE_SIZE // 32, IMAGE_SIZE // 16],
         img_dir=IMG_DIR,
         label_dir=LABEL_DIR,
